@@ -8,6 +8,8 @@ build/
 Auth.txt
 supabase/.temp/
 edge_functions/dist/
+out.json
+golf_res.json
 mobile/node_modules/
 mobile/.expo/
 *.local
