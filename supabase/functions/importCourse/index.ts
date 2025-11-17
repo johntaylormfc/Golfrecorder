@@ -20,7 +20,11 @@ serve(async (req: Request) => {
 		if (externalId) {
 			const apiUrl = `https://api.golfcourseapi.com/v1/courses/${encodeURIComponent(externalId)}`;
 			const apiRes = await fetch(apiUrl, { headers: { 'x-api-key': GOLF_API_KEY } });
-			if (!apiRes.ok) return new Response('Course not found', { status: 404 });
+			if (!apiRes.ok) {
+				const text = await apiRes.text();
+				console.error('Golf API error (externalId):', apiRes.status, text);
+				return new Response(JSON.stringify({ error: 'Course not found', status: apiRes.status, body: text }), { status: 502 });
+			}
 			const course = await apiRes.json();
 
 			const courseUpsert = {
@@ -71,7 +75,11 @@ serve(async (req: Request) => {
 		if (q) {
 			const apiUrl = `https://api.golfcourseapi.com/v1/courses?search=${encodeURIComponent(q)}`;
 			const apiRes = await fetch(apiUrl, { headers: { 'x-api-key': GOLF_API_KEY } });
-			if (!apiRes.ok) return new Response('Golf API request failed', { status: 502 });
+			if (!apiRes.ok) {
+				const text = await apiRes.text();
+				console.error('Golf API error (search):', apiRes.status, text);
+				return new Response(JSON.stringify({ error: 'Golf API request failed', status: apiRes.status, body: text }), { status: 502 });
+			}
 			const searchResults = await apiRes.json();
 
 			const upserted = [] as any[];

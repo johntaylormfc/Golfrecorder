@@ -101,7 +101,9 @@ serve(async (req: Request) => {
     });
 
     if (!response.ok) {
-      return new Response('LLM call failed', { status: 502 });
+      const text = await response.text();
+      console.error('LLM error:', response.status, text);
+      return new Response(JSON.stringify({ error: 'LLM call failed', status: response.status, body: text }), { status: 502 });
     }
 
     const payload = await response.json();
