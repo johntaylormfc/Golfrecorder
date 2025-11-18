@@ -5,6 +5,7 @@ import { getUserClubs } from '../services/api';
 import { weatherService, type WeatherData } from '../services/weather';
 import VoiceInputModal from '../components/VoiceInputModal';
 import ClubSuggestions from '../components/ClubSuggestions';
+import CourseManagementCoach from '../components/CourseManagementCoach';
 import { VoiceInputResult } from '../services/voiceInput';
 import { SuggestionContext } from '../services/clubSuggestion';
 
@@ -128,6 +129,9 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
 
   // Voice input
   const [showVoiceModal, setShowVoiceModal] = useState(false);
+  
+  // Course management coach
+  const [showCourseCoach, setShowCourseCoach] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -409,13 +413,23 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
             {editingShot ? `Edit Shot #${editingShot.shot_number} — Hole ${holeNumber}` : `Shot ${nextShotNumber} — Hole ${holeNumber}`}
           </Text>
           
-          {/* Voice Input Button */}
-          <TouchableOpacity 
-            style={styles.voiceButton}
-            onPress={() => setShowVoiceModal(true)}
-          >
-            <Text style={styles.voiceButtonIcon}>🎤</Text>
-          </TouchableOpacity>
+          <View style={styles.headerButtons}>
+            {/* Course Coach Button */}
+            <TouchableOpacity 
+              style={styles.coachButton}
+              onPress={() => setShowCourseCoach(true)}
+            >
+              <Text style={styles.coachButtonIcon}>🧠</Text>
+            </TouchableOpacity>
+            
+            {/* Voice Input Button */}
+            <TouchableOpacity 
+              style={styles.voiceButton}
+              onPress={() => setShowVoiceModal(true)}
+            >
+              <Text style={styles.voiceButtonIcon}>🎤</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Shot Category */}
@@ -1010,6 +1024,46 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
         onClose={() => setShowVoiceModal(false)}
         onResult={handleVoiceResult}
       />
+      
+      {/* Course Management Coach */}
+      <CourseManagementCoach
+        isVisible={showCourseCoach}
+        shotContext={{
+          category: category,
+          club: club,
+          lie: startLie,
+          distanceToPin: startDistance,
+          holeNumber: holeNumber,
+          shotNumber: nextShotNumber,
+          roundScore: undefined, // Could be passed from parent if available
+          parValue: 4, // Could be passed from parent if available
+          weather: weatherData ? {
+            windSpeed: weatherData.windSpeed,
+            windDirection: weatherData.windDirection,
+            temperature: weatherData.temperature,
+            conditions: weatherData.conditions
+          } : undefined,
+          previousShots: previousShots?.map(shot => ({
+            result: shot.result_zone || 'Acceptable',
+            category: shot.shot_category || 'approach',
+            club: shot.club || ''
+          }))
+        }}
+        onStrategySelected={(strategy) => {
+          // Could update UI based on selected strategy
+          console.log('Strategy selected:', strategy);
+          setShowCourseCoach(false);
+        }}
+      />
+      
+      {/* Overlay to close coach when clicking outside */}
+      {showCourseCoach && (
+        <TouchableOpacity 
+          style={styles.overlay}
+          activeOpacity={1}
+          onPress={() => setShowCourseCoach(false)}
+        />
+      )}
     </Modal>
   );
 }
@@ -1033,6 +1087,26 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  coachButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#8b5cf6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  coachButtonIcon: {
+    fontSize: 20,
+  },
   voiceButton: {
     width: 44,
     height: 44,
@@ -1048,6 +1122,15 @@ const styles = StyleSheet.create({
   },
   voiceButtonIcon: {
     fontSize: 20,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
   },
   label: {
     fontSize: 14,
