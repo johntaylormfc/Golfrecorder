@@ -288,6 +288,7 @@ export default function PlayRoundScreen({ route, navigation }: any) {
         lastSavedAt={lastSavedAt}
         editingShot={editingShot}
         holeYardage={getHoleYardage(holeNumber)}
+        courseLocation={round?.course_location || null}
       />
 
       {/* Scorecard Modal */}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TextInput, Switch, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Shot } from '../types';
 import { getUserClubs } from '../services/api';
+import { weatherService, type WeatherData } from '../services/weather';
 
 interface Props {
   visible: boolean;
@@ -14,6 +15,7 @@ interface Props {
   previousShots?: any[];
   editingShot?: any | null;
   holeYardage?: number | null;
+  courseLocation?: { latitude: number; longitude: number } | null;
 }
 
 type ShotCategory = 'tee' | 'approach' | 'around_green' | 'putt';
@@ -34,7 +36,7 @@ type WindStrength = 'Calm' | 'Light' | 'Moderate' | 'Strong';
 type WindDirection = 'Into' | 'Down' | 'Cross-left' | 'Cross-right' | 'Variable';
 type LieSeverity = 'Perfect' | 'OK' | 'Poor';
 
-export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotNumber, previousShots = [], saving = false, lastSavedAt = null, editingShot = null, holeYardage = null }: Props) {
+export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotNumber, previousShots = [], saving = false, lastSavedAt = null, editingShot = null, holeYardage = null, courseLocation = null }: Props) {
   // User's clubs from profile
   const [userClubs, setUserClubs] = useState<string[]>([]);
   
@@ -115,6 +117,10 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
   
   // Conditions
   const [lieSeverity, setLieSeverity] = useState<LieSeverity | null>(null);
+  
+  // Weather data
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -191,6 +197,34 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
       setLieSeverity('Perfect');
     }
   }, [category]);
+
+  // Load weather data when modal opens
+  useEffect(() => {
+    if (visible && !weatherData && courseLocation) {
+      loadWeatherData();
+    }
+  }, [visible, courseLocation]);
+
+  async function loadWeatherData() {
+    setWeatherLoading(true);
+    try {
+      const weather = await weatherService.getCourseWeather(courseLocation);
+      setWeatherData(weather);
+    } catch (error) {
+      console.error('Failed to load weather data:', error);
+      // Use demo data as fallback
+      const demoWeather = await weatherService.getDemoWeather();
+      setWeatherData(demoWeather);
+    } finally {
+      setWeatherLoading(false);
+    }
+  }
+
+  async function refreshWeatherData() {
+    if (courseLocation) {
+      await loadWeatherData();
+    }
+  }
 
   async function loadUserClubs() {
     const clubs = await getUserClubs();
@@ -716,7 +750,71 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
               </>
             )}
 
-            <Text style={styles.sectionTitle}>Conditions</Text>
+            <Text style={styles.sectionTitle}>Weather Conditions</Text>
+            {weatherLoading ? (
+              <Text style={styles.loadingText}>Loading weather...</Text>
+            ) : weatherData ? (
+              <View style={styles.weatherContainer}>
+                <View style={styles.weatherRow}>
+                  <Text style={styles.weatherLabel}>Temperature:</Text>
+                  <Text style={styles.weatherValue}>{weatherData.temperature}°F (feels like {weatherData.feelsLike}°F)</Text>
+                </View>
+                <View style={styles.weatherRow}>
+                  <Text style={styles.weatherLabel}>Conditions:</Text>
+                  <Text style={styles.weatherValue}>{weatherData.description}</Text>
+                </View>
+                <View style={styles.weatherRow}>
+                  <Text style={styles.weatherLabel}>Wind:</Text>
+                  <Text style={styles.weatherValue}>
+                    {weatherData.windSpeed} mph {weatherService.getWindDirection(weatherData.windDirection)}
+                    {weatherData.windGust ? ` (gusts ${weatherData.windGust} mph)` : ''}
+                  </Text>
+                </View>
+                <View style={styles.weatherRow}>
+                  <Text style={styles.weatherLabel}>Humidity:</Text>
+                  <Text style={styles.weatherValue}>{weatherData.humidity}%</Text>
+                </View>
+                
+                {/* Golf Impact Analysis */}
+                {(() => {
+                  const analysis = weatherService.getGolfConditionsAnalysis(weatherData);
+                  return (
+                    <View style={styles.weatherAnalysis}>
+                      <Text style={[styles.weatherImpact, 
+                        analysis.impact === 'excellent' && styles.impactExcellent,
+                        analysis.impact === 'good' && styles.impactGood,
+                        analysis.impact === 'challenging' && styles.impactChallenging,
+                        analysis.impact === 'difficult' && styles.impactDifficult
+                      ]}>
+                        Conditions: {analysis.impact.charAt(0).toUpperCase() + analysis.impact.slice(1)}
+                      </Text>
+                      {analysis.recommendations.length > 0 && (
+                        <Text style={styles.weatherTip}>
+                          💡 {analysis.recommendations[0]}
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })()}
+                
+                <TouchableOpacity 
+                  style={styles.refreshWeatherButton} 
+                  onPress={refreshWeatherData}
+                  disabled={weatherLoading}
+                >
+                  <Text style={styles.refreshWeatherText}>🔄 Refresh</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.weatherContainer}>
+                <Text style={styles.weatherUnavailable}>Weather data unavailable</Text>
+                <TouchableOpacity style={styles.refreshWeatherButton} onPress={refreshWeatherData}>
+                  <Text style={styles.refreshWeatherText}>🔄 Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <Text style={styles.sectionTitle}>Shot Conditions</Text>
             
             {category !== 'tee' && (
               <>
@@ -1032,6 +1130,82 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'center',
+  },
+  
+  // Weather styles
+  loadingText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginVertical: 8,
+  },
+  weatherContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 8,
+  },
+  weatherRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  weatherLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  weatherValue: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '600',
+  },
+  weatherAnalysis: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#fff',
+    borderRadius: 6,
+  },
+  weatherImpact: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  impactExcellent: {
+    color: '#28a745',
+  },
+  impactGood: {
+    color: '#6f42c1',
+  },
+  impactChallenging: {
+    color: '#fd7e14',
+  },
+  impactDifficult: {
+    color: '#dc3545',
+  },
+  weatherTip: {
+    fontSize: 12,
+    color: '#495057',
+    fontStyle: 'italic',
+  },
+  refreshWeatherButton: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#e9ecef',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  refreshWeatherText: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
+  weatherUnavailable: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
 

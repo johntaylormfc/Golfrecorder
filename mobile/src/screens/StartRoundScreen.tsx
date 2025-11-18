@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
-import { supabase } from '../services/supabase';
+import { supabase } from '../services/supabase';\nimport { weatherService } from '../services/weather';
 
 export default function StartRoundScreen({ navigation }: any) {
   const [query, setQuery] = useState('');
@@ -208,6 +208,15 @@ export default function StartRoundScreen({ navigation }: any) {
     
     setLoading(true);
     try {
+      // Try to get weather data for the course location
+      let weatherData = null;
+      try {
+        weatherData = await weatherService.getCourseWeather(selectedCourse);
+      } catch (weatherError) {
+        console.log('Failed to fetch weather:', weatherError);
+        // Continue without weather data
+      }
+
       const { data, error } = await supabase
         .from('rounds')
         .insert({
@@ -215,7 +224,20 @@ export default function StartRoundScreen({ navigation }: any) {
           course_id: selectedCourse.id,
           tee_id: selectedTeeId,
           started_at: new Date().toISOString(),
-          status: 'in_progress'
+          status: 'in_progress',
+          weather_data: weatherData ? {
+            temperature: weatherData.temperature,
+            humidity: weatherData.humidity,
+            wind_speed: weatherData.windSpeed,
+            wind_direction: weatherData.windDirection,
+            wind_gust: weatherData.windGust,
+            description: weatherData.description,
+            visibility: weatherData.visibility,
+            pressure: weatherData.pressure,
+            uv_index: weatherData.uvIndex,
+            feels_like: weatherData.feelsLike
+          } : null,
+          weather_fetched_at: weatherData ? new Date().toISOString() : null
         })
         .select()
         .single();

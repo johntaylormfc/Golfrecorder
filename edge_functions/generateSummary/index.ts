@@ -72,6 +72,8 @@ serve(async (req: Request) => {
         holes_played: round.holes_played,
         total_score: round.total_score,
         par_total: round.par_total,
+        weather_data: round.weather_data ?? null,
+        weather_fetched_at: round.weather_fetched_at ?? null,
       },
       round_holes: roundHoles ?? [],
       shots: shots ?? [],
@@ -80,7 +82,7 @@ serve(async (req: Request) => {
       }
     };
 
-    const systemMessage = `You are a friendly but precise golf coach analysing a single round for an amateur golfer based on detailed shot data. You are given structured JSON describing the player, the round overview, hole-by-hole summary, and each shot. Provide a concise coaching-style report in Markdown, with sections for Overall, Tee Shots, Approaches, Short Game, Putting, Key Patterns, and 3-5 Things to Work On. Do not mention database tables or JSON keys.`;
+    const systemMessage = `You are a friendly but precise golf coach analysing a single round for an amateur golfer based on detailed shot data. You are given structured JSON describing the player, the round overview, hole-by-hole summary, and each shot. If weather data is available, factor in conditions like wind, temperature, and humidity when analyzing performance. Consider how weather may have impacted shot distances, ball flight, and playing conditions. Provide a concise coaching-style report in Markdown, with sections for Overall, Tee Shots, Approaches, Short Game, Putting, Key Patterns, and 3-5 Things to Work On. Include weather impact in your analysis when available. Do not mention database tables or JSON keys.`;
     const userMessage = `Please analyse the following golf round and produce a concise yet insightful coaching-style summary for the player. JSON data:\n\n${JSON.stringify(json)}`;
 
     if (!LLM_API_KEY) return new Response('LLM not configured', { status: 500 });

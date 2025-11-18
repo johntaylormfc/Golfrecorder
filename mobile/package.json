@@ -15,6 +15,7 @@
     "@react-navigation/stack": "^6.4.1",
     "@supabase/supabase-js": "^2.47.10",
     "expo": "~54.0.25",
+    "expo-location": "^19.0.7",
     "punycode": "^2.3.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
