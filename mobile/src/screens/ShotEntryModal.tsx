@@ -3,6 +3,10 @@ import { View, Text, Modal, TextInput, Switch, ScrollView, TouchableOpacity, Sty
 import { Shot } from '../types';
 import { getUserClubs } from '../services/api';
 import { weatherService, type WeatherData } from '../services/weather';
+import VoiceInputModal from '../components/VoiceInputModal';
+import ClubSuggestions from '../components/ClubSuggestions';
+import { VoiceInputResult } from '../services/voiceInput';
+import { SuggestionContext } from '../services/clubSuggestion';
 
 interface Props {
   visible: boolean;
@@ -122,6 +126,9 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
 
+  // Voice input
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+
   useEffect(() => {
     if (visible) {
       loadUserClubs();
@@ -231,6 +238,122 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
     setUserClubs(clubs.length > 0 ? clubs : ['Driver', '7 Iron', 'Pitching Wedge', 'Putter']);
   }
 
+  function handleVoiceResult(result: VoiceInputResult) {
+    // Map voice recognition results to form fields
+    const { parsedData } = result;
+    
+    // Set club if recognized
+    if (parsedData.club) {
+      setClub(parsedData.club);
+    }
+    
+    // Set distances
+    if (parsedData.distance) {
+      if (parsedData.distanceUnit === 'feet') {
+        // Likely a putt - set end distance in feet
+        setEndDistance(parsedData.distance);
+        if (parsedData.distance > 3) {
+          // Long putt, probably start distance
+          setStartDistance(Math.round(parsedData.distance / 3)); // Convert feet to approximate yards for display
+        }
+      } else {
+        // Yards - set as start distance
+        setStartDistance(parsedData.distance);
+      }
+    }
+    
+    // Set shot shape if recognized
+    if (parsedData.shotShape) {
+      const shapeMapping: { [key: string]: ShotShape } = {
+        'draw': 'Intended draw',
+        'fade': 'Intended fade',
+        'straight': 'Straight',
+        'hook': 'Hook',
+        'slice': 'Slice',
+        'pull': 'Pull',
+        'push': 'Push'
+      };
+      const mappedShape = shapeMapping[parsedData.shotShape];
+      if (mappedShape) {
+        setShotShape(mappedShape);
+      }
+    }
+    
+    // Set trajectory
+    if (parsedData.trajectory) {
+      const trajectoryMapping: { [key: string]: Trajectory } = {
+        'low': 'Low',
+        'normal': 'Normal',
+        'high': 'High'
+      };
+      const mappedTrajectory = trajectoryMapping[parsedData.trajectory];
+      if (mappedTrajectory) {
+        setTrajectory(mappedTrajectory);
+      }
+    }
+    
+    // Set result zone
+    if (parsedData.result) {
+      const resultMapping: { [key: string]: ResultZone } = {
+        'good': 'Good',
+        'acceptable': 'Acceptable',
+        'poor': 'Poor',
+        'ob': 'OB',
+        'hazard': 'Hazard',
+        'lost': 'Lost Ball'
+      };
+      const mappedResult = resultMapping[parsedData.result];
+      if (mappedResult) {
+        setResultZone(mappedResult);
+        
+        // Auto-set penalties for certain results
+        if (mappedResult === 'OB' || mappedResult === 'Lost Ball') {
+          setHasPenalty(true);
+          setPenaltyStrokes(2);
+          setPenaltyType('Stroke and Distance');
+        } else if (mappedResult === 'Hazard') {
+          setHasPenalty(true);
+          setPenaltyStrokes(1);
+          setPenaltyType('Hazard');
+        }
+      }
+    }
+    
+    // Set lie information
+    if (parsedData.lie) {
+      const lieMapping: { [key: string]: LieType } = {
+        'tee': 'Tee box',
+        'fairway': 'Fairway',
+        'rough': 'Light rough',
+        'bunker': 'Fairway bunker',
+        'green': 'Green'
+      };
+      const mappedLie = lieMapping[parsedData.lie];
+      if (mappedLie) {
+        // Set as start lie for new shots, or end lie if it makes more sense
+        if (nextShotNumber === 1) {
+          setStartLie(mappedLie);
+        } else {
+          setEndLie(mappedLie);
+        }
+      }
+    }
+    
+    // Set category based on club
+    if (parsedData.club) {
+      const club = parsedData.club.toLowerCase();
+      if (club.includes('putter')) {
+        setCategory('putt');
+      } else if (nextShotNumber === 1 || club.includes('driver')) {
+        setCategory('tee');
+      } else if (club.includes('wedge') || endDistance < 30) {
+        setCategory('around_green');
+      } else {
+        setCategory('approach');
+      }
+    }
+  }
+
   function saveShot() {
     const shotData: Partial<Shot> = {
       shot_category: category,
@@ -281,9 +404,19 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
   return (
     <Modal visible={visible} animationType="slide">
       <ScrollView style={styles.container}>
-        <Text style={styles.title}>
-          {editingShot ? `Edit Shot #${editingShot.shot_number} — Hole ${holeNumber}` : `Shot ${nextShotNumber} — Hole ${holeNumber}`}
-        </Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>
+            {editingShot ? `Edit Shot #${editingShot.shot_number} — Hole ${holeNumber}` : `Shot ${nextShotNumber} — Hole ${holeNumber}`}
+          </Text>
+          
+          {/* Voice Input Button */}
+          <TouchableOpacity 
+            style={styles.voiceButton}
+            onPress={() => setShowVoiceModal(true)}
+          >
+            <Text style={styles.voiceButtonIcon}>🎤</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Shot Category */}
         <Text style={styles.label}>Shot Category</Text>
@@ -333,6 +466,25 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
         {category !== 'putt' && (
           <>
             <Text style={styles.label}>Club</Text>
+            
+            {/* Smart Club Suggestions */}
+            <ClubSuggestions
+              context={{
+                distanceToPin: startDistance,
+                lie: startLie,
+                shotCategory: category,
+                windConditions: weatherData ? {
+                  speed: weatherData.windSpeed,
+                  direction: weatherData.windSpeed < 3 ? 'calm' : 
+                           weatherData.windDirection >= 315 || weatherData.windDirection < 45 ? 'into' :
+                           weatherData.windDirection >= 135 && weatherData.windDirection < 225 ? 'down' : 'cross'
+                } : undefined
+              } as SuggestionContext}
+              onClubSelect={(selectedClub) => setClub(selectedClub)}
+              selectedClub={club}
+              visible={startDistance > 0}
+            />
+            
             <View style={styles.chipGrid}>
               {userClubs.map((clubName) => (
                 <TouchableOpacity
@@ -851,6 +1003,13 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
         
         <View style={{ height: 40 }} />
       </ScrollView>
+      
+      {/* Voice Input Modal */}
+      <VoiceInputModal
+        visible={showVoiceModal}
+        onClose={() => setShowVoiceModal(false)}
+        onResult={handleVoiceResult}
+      />
     </Modal>
   );
 }
@@ -861,11 +1020,34 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    marginTop: 10,
+  },
   title: {
     fontSize: 20,
     fontWeight: '700',
-    marginBottom: 20,
-    marginTop: 10,
+    flex: 1,
+    marginRight: 12,
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  voiceButtonIcon: {
+    fontSize: 20,
   },
   label: {
     fontSize: 14,
