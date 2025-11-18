@@ -344,8 +344,6 @@ export default function PlayRoundScreen({ route, navigation }: any) {
       <Button title="Add shot" onPress={openAddShot} />
       <Button title="Undo last shot" onPress={undoLastShot} disabled={shots.filter((s) => s.hole_number === holeNumber).length === 0} />
       <Button title="View Scorecard" onPress={() => setScorecardVisible(true)} />
-      <Button title="Prev hole" onPress={prevHole} disabled={holeNumber === 1} />
-      <Button title="Next hole" onPress={nextHole} disabled={holeNumber >= 18} />
       <Button title="Finish hole" onPress={finishHole} disabled={shots.filter((s) => s.hole_number === holeNumber).length === 0} />
       <Button title="End round" onPress={confirmEndRound} />
 
