@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
-import { supabase } from '../services/supabase';\nimport { weatherService } from '../services/weather';
+import { supabase } from '../services/supabase';
+import { weatherService } from '../services/weather';
 
 export default function StartRoundScreen({ navigation }: any) {
   const [query, setQuery] = useState('');

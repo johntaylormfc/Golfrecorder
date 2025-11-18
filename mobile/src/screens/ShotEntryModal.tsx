@@ -224,7 +224,7 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
     } catch (error) {
       console.error('Failed to load weather data:', error);
       // Use demo data as fallback
-      const demoWeather = await weatherService.getDemoWeather();
+      const demoWeather = await weatherService.getCurrentWeather(courseLocation?.latitude || 40.7128, courseLocation?.longitude || -74.0060);
       setWeatherData(demoWeather);
     } finally {
       setWeatherLoading(false);
@@ -1039,9 +1039,9 @@ export function ShotEntryModal({ visible, onClose, onSave, holeNumber, nextShotN
           parValue: 4, // Could be passed from parent if available
           weather: weatherData ? {
             windSpeed: weatherData.windSpeed,
-            windDirection: weatherData.windDirection,
+            windDirection: weatherData.windDirection.toString(),
             temperature: weatherData.temperature,
-            conditions: weatherData.conditions
+            conditions: weatherData.description || 'normal'
           } : undefined,
           previousShots: previousShots?.map(shot => ({
             result: shot.result_zone || 'Acceptable',

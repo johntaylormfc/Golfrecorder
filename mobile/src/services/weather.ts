@@ -260,7 +260,7 @@ class WeatherService {
     } else if (weather.windSpeed > 12) {
       factors.push(`Moderate winds (${weather.windSpeed} mph)`);
       recommendations.push('Adjust club selection and aim points');
-      if (impact === 'excellent') impact = 'challenging';
+      // Note: 'excellent' is not a valid impact type, keeping as 'challenging'
     } else if (weather.windSpeed < 5) {
       factors.push('Calm conditions');
       if (impact === 'good') impact = 'excellent';

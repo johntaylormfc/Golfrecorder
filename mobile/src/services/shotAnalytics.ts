@@ -65,8 +65,10 @@ export interface ShotPatternAnalysis {
 class ShotAnalyticsService {
   /**
    * Get comprehensive shot pattern analysis for a user
+   * Fixed: ordering by created_at instead of rounds.started_at
    */
   async getUserShotAnalysis(userId: string, roundLimit = 10): Promise<ShotPatternAnalysis> {
+    console.log('DEBUG: getUserShotAnalysis called with fixed query');
     try {
       // Get recent shots with round data
       const { data: shots, error } = await supabase
@@ -76,7 +78,7 @@ class ShotAnalyticsService {
           rounds!inner(user_id, started_at)
         `)
         .eq('rounds.user_id', userId)
-        .order('rounds.started_at', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(roundLimit * 100); // Approximate limit
 
       if (error) throw error;

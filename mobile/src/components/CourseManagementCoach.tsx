@@ -9,9 +9,32 @@ import {
   ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { shotDecisionEngineService, StrategicAnalysis } from '../services/shotDecisionEngine';
+import { shotDecisionEngine, ShotDecision } from '../services/shotDecisionEngine';
 import { lieIntelligenceService, LiePrediction, LieAnalysis } from '../services/lieIntelligence';
 import { pressureAnalyticsService, PressureAnalysis } from '../services/pressureAnalytics';
+
+// Extended strategic analysis interface based on ShotDecision
+interface StrategicAnalysis {
+  primaryStrategy: {
+    name: string;
+    description: string;
+    confidence: number;
+    reasoning: string[];
+  };
+  alternatives: Array<{
+    name: string;
+    description: string;
+    confidence: number;
+  }>;
+  riskAssessment: {
+    successProbability: number;
+    riskLevel: 'low' | 'medium' | 'high';
+    factors: Array<{
+      factor: string;
+      impact: number;
+    }>;
+  };
+}
 
 interface CourseManagementCoachProps {
   shotContext: {
@@ -83,13 +106,51 @@ const CourseManagementCoach: React.FC<CourseManagementCoachProps> = ({
     setIsLoading(true);
     try {
       // Load all analyses in parallel
-      const [strategic, pressure] = await Promise.all([
-        shotDecisionEngineService.analyzeShot(shotContext),
+        const shotDecisionContext = {
+          distanceToPin: shotContext.distanceToPin,
+          lie: shotContext.lie,
+          holeNumber: shotContext.holeNumber,
+          currentScore: shotContext.roundScore || 0,
+          parForHole: shotContext.parValue,
+          shotNumber: shotContext.shotNumber,
+          weather: shotContext.weather ? {
+            windSpeed: shotContext.weather.windSpeed,
+            conditions: shotContext.weather.conditions
+          } : undefined
+        };
+        
+        const [strategic, pressure] = await Promise.all([
+        shotDecisionEngine.getShotDecision(shotDecisionContext),
         pressureAnalyticsService.analyzePressureShot(shotContext)
       ]);
 
-      setStrategicAnalysis(strategic);
       setPressureAnalysis(pressure);
+
+      // Convert ShotDecision to StrategicAnalysis format
+      const convertedStrategic: StrategicAnalysis = {
+        primaryStrategy: {
+          name: strategic.recommendation,
+          description: strategic.reasoning[0] || 'Strategic recommendation',
+          confidence: strategic.confidence,
+          reasoning: strategic.reasoning
+        },
+        alternatives: strategic.alternativeStrategy ? [{
+          name: strategic.alternativeStrategy.strategy,
+          description: strategic.alternativeStrategy.pros.join(', '),
+          confidence: Math.max(0, strategic.confidence - 20)
+        }] : [],
+        riskAssessment: {
+          successProbability: strategic.riskAssessment.successProbability,
+          riskLevel: strategic.riskAssessment.successProbability > 0.8 ? 'low' : 
+                    strategic.riskAssessment.successProbability > 0.6 ? 'medium' : 'high',
+          factors: [
+            { factor: 'Success Probability', impact: strategic.riskAssessment.successProbability * 10 },
+            { factor: 'Situation Assessment', impact: strategic.confidence / 10 }
+          ]
+        }
+      };
+      
+      setStrategicAnalysis(convertedStrategic);
 
       // Load lie analysis and prediction
       const currentLieAnalysis = await lieIntelligenceService.analyzeLiePerformance(shotContext.lie);
@@ -153,7 +214,7 @@ const CourseManagementCoach: React.FC<CourseManagementCoachProps> = ({
         <>
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="target-outline" size={16} color="#3b82f6" />
+              <Ionicons name="trophy-outline" size={16} color="#3b82f6" />
               <Text style={styles.sectionTitle}>Primary Strategy</Text>
               <View style={[styles.confidenceBadge, { backgroundColor: strategicAnalysis.primaryStrategy.confidence >= 80 ? '#22c55e' : strategicAnalysis.primaryStrategy.confidence >= 60 ? '#f59e0b' : '#ef4444' }]}>
                 <Text style={styles.confidenceText}>{strategicAnalysis.primaryStrategy.confidence}%</Text>
@@ -374,7 +435,7 @@ const CourseManagementCoach: React.FC<CourseManagementCoachProps> = ({
 
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="brain-outline" size={16} color="#8b5cf6" />
+              <Ionicons name="bulb-outline" size={16} color="#8b5cf6" />
               <Text style={styles.sectionTitle}>Mental Game</Text>
             </View>
             

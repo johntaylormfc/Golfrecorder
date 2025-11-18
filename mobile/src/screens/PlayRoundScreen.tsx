@@ -198,6 +198,81 @@ export default function PlayRoundScreen({ route, navigation }: any) {
 
   return (
     <View style={{ flex: 1, padding: 16 }}>
+      {/* Hole Navigation Grid */}
+      <View style={styles.holeNavigationContainer}>
+        <Text style={styles.holeNavigationTitle}>Quick Hole Navigation</Text>
+        
+        {/* Front 9 */}
+        <View style={styles.holeRow}>
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((hole) => {
+            const holeData = roundHoles.find((rh) => rh.hole_number === hole);
+            const isCurrentHole = hole === holeNumber;
+            const score = holeData?.gross_score;
+            const par = getHolePar(hole) || holeData?.par;
+            
+            return (
+              <TouchableOpacity
+                key={hole}
+                style={[
+                  styles.holeButton,
+                  isCurrentHole && styles.currentHoleButton,
+                  score != null && styles.completedHoleButton
+                ]}
+                onPress={() => setHoleNumber(hole)}
+              >
+                <Text style={[
+                  styles.holeButtonNumber,
+                  isCurrentHole && styles.currentHoleText
+                ]}>
+                  {hole}
+                </Text>
+                <Text style={[
+                  styles.holeButtonScore,
+                  isCurrentHole && styles.currentHoleText
+                ]}>
+                  {score ?? '-'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        
+        {/* Back 9 */}
+        <View style={styles.holeRow}>
+          {[10, 11, 12, 13, 14, 15, 16, 17, 18].map((hole) => {
+            const holeData = roundHoles.find((rh) => rh.hole_number === hole);
+            const isCurrentHole = hole === holeNumber;
+            const score = holeData?.gross_score;
+            const par = getHolePar(hole) || holeData?.par;
+            
+            return (
+              <TouchableOpacity
+                key={hole}
+                style={[
+                  styles.holeButton,
+                  isCurrentHole && styles.currentHoleButton,
+                  score != null && styles.completedHoleButton
+                ]}
+                onPress={() => setHoleNumber(hole)}
+              >
+                <Text style={[
+                  styles.holeButtonNumber,
+                  isCurrentHole && styles.currentHoleText
+                ]}>
+                  {hole}
+                </Text>
+                <Text style={[
+                  styles.holeButtonScore,
+                  isCurrentHole && styles.currentHoleText
+                ]}>
+                  {score ?? '-'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
       <Text>Playing round: {round?.id}</Text>
       <Text>Hole: {holeNumber}</Text>
       <View style={{ marginVertical: 10 }}>
@@ -479,6 +554,67 @@ export default function PlayRoundScreen({ route, navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  holeNavigationContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  holeNavigationTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  holeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  holeButton: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 8,
+    minWidth: 38,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  currentHoleButton: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+    shadowColor: '#007AFF',
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  completedHoleButton: {
+    backgroundColor: '#e8f5e9',
+    borderColor: '#4caf50',
+  },
+  holeButtonNumber: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#333',
+    lineHeight: 14,
+  },
+  holeButtonScore: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    lineHeight: 16,
+  },
+  currentHoleText: {
+    color: '#fff',
+  },
   shotItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',

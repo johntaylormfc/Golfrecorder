@@ -159,7 +159,7 @@ export async function saveCourseToDatabase(courseData: any) {
     
     const { error: teeError } = await supabase
       .from('course_tees')
-      .upsert(teeUpsert, { onConflict: ['course_id', 'tee_name'] });
+      .upsert(teeUpsert, { onConflict: 'course_id,tee_name' });
     
     if (teeError) {
       console.error('Error saving tee:', teeError);
@@ -203,7 +203,7 @@ export async function generateRoundSummary(roundId: string) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
 
-  const response = await fetch(`${supabase.supabaseUrl}/functions/v1/generateSummary/rounds/${roundId}/generate_summary`, {
+  const response = await fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/generateSummary/rounds/${roundId}/generate_summary`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
