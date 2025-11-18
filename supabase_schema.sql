@@ -14,10 +14,21 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at timestamptz DEFAULT now()
 );
 
+-- Clubs (user's bag)
+CREATE TABLE IF NOT EXISTS clubs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  club_type text NOT NULL, -- 'Driver', '3 Wood', '5 Wood', '3 Hybrid', '4 Iron', etc.
+  display_order int NOT NULL DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE (user_id, club_type)
+);
+
 -- Courses
 CREATE TABLE IF NOT EXISTS courses (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  external_id text, -- id from golfcourseapi
+  external_id text UNIQUE, -- id from golfcourseapi - must be unique for upsert
   name text NOT NULL,
   city text,
   region text,
@@ -37,10 +48,12 @@ CREATE TABLE IF NOT EXISTS course_tees (
   tee_color text,
   rating numeric,
   slope numeric,
+  par_total int,
   yardages jsonb, -- {"hole_1": 380, "hole_2": 445, ...}
   metadata jsonb,
   created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE (course_id, tee_name)
 );
 
 -- Course holes (basic per-hole properties - yardages optional if stored by tee)
@@ -147,6 +160,7 @@ CREATE INDEX IF NOT EXISTS idx_courses_external_id ON courses (external_id);
 
 -- Enable RLS where necessary
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clubs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE rounds ENABLE ROW LEVEL SECURITY;
 ALTER TABLE round_holes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE shots ENABLE ROW LEVEL SECURITY;
@@ -158,6 +172,10 @@ CREATE POLICY "profiles_select_update_owner" ON profiles
 -- Policy: only authenticated users can insert new profiles linked to their auth.id
 CREATE POLICY "profiles_insert_authenticated" ON profiles
   FOR INSERT USING (auth.role() = 'authenticated') WITH CHECK (id = auth.uid());
+
+-- RLS for clubs: only owner can read/write their clubs
+CREATE POLICY "clubs_owner_policy" ON clubs
+  FOR ALL USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
 
 -- RLS for rounds: only owner can read/write their rounds
 CREATE POLICY "rounds_owner_policy" ON rounds
@@ -176,7 +194,15 @@ CREATE POLICY "shots_round_owner" ON shots
 -- Courses, course_tees, course_holes: public read access so clients can view cached course data
 ALTER TABLE courses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "courses_public_read" ON courses FOR SELECT USING (true);
+CREATE POLICY "courses_authenticated_write" ON courses FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "courses_authenticated_update" ON courses FOR UPDATE USING (true) WITH CHECK (true);
+
+ALTER TABLE course_tees ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "course_tees_public_read" ON course_tees FOR SELECT USING (true);
+CREATE POLICY "course_tees_authenticated_write" ON course_tees FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "course_tees_authenticated_update" ON course_tees FOR UPDATE USING (true) WITH CHECK (true);
+
+ALTER TABLE course_holes ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "course_holes_public_read" ON course_holes FOR SELECT USING (true);
 
 -- For course insert/update by a server or admin role, additional policies should be created as needed.
@@ -192,6 +218,8 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER set_timestamp
 BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
+CREATE TRIGGER set_timestamp_clubs
+BEFORE UPDATE ON clubs FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_rounds
 BEFORE UPDATE ON rounds FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();
 CREATE TRIGGER set_timestamp_course_tees

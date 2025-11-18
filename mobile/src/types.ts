@@ -4,7 +4,7 @@ export type Handedness = 'right' | 'left';
 export type ShotCategory = 'tee' | 'approach' | 'around_green' | 'putt';
 
 export interface Profile {
-  id: string; // uuid
+  id: string; // uuid - PRIMARY KEY references auth.users(id)
   display_name: string;
   handicap_index?: number | null;
   handedness: Handedness;
