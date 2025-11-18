@@ -298,6 +298,13 @@ export default function HomeScreen({ navigation }: any) {
 
       <View style={styles.bottomActions}>
         <TouchableOpacity
+          style={styles.analyticsButton}
+          onPress={() => navigation.navigate('Analytics')}
+        >
+          <Text style={styles.analyticsButtonText}>📊 Shot Analytics</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
           style={styles.startRoundButton}
           onPress={startNewRound}
         >
@@ -531,6 +538,18 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
+  },
+  analyticsButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  analyticsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   startRoundButton: {
     backgroundColor: '#4caf50',

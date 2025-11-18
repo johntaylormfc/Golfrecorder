@@ -7,6 +7,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import StartRoundScreen from './src/screens/StartRoundScreen';
 import PlayRoundScreen from './src/screens/PlayRoundScreen';
 import RoundSummaryScreen from './src/screens/RoundSummaryScreen';
+import AnalyticsScreen from './src/screens/AnalyticsScreen';
 
 const Stack = createStackNavigator();
 
@@ -19,6 +20,7 @@ export default function App() {
         <Stack.Screen name="StartRound" component={StartRoundScreen} />
         <Stack.Screen name="PlayRound" component={PlayRoundScreen} />
         <Stack.Screen name="RoundSummary" component={RoundSummaryScreen} />
+        <Stack.Screen name="Analytics" component={AnalyticsScreen} options={{ headerShown: false }} />
       </Stack.Navigator>
     </NavigationContainer>
   );
