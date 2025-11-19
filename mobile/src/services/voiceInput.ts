@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
 
 // Voice input service for golf shot entry
 // Provides speech-to-text functionality and natural language parsing for golf terms
@@ -16,6 +16,46 @@ export interface VoiceInputResult {
     confidence: number; // 0-1 score
   };
   suggestions: string[];
+}
+
+// Text input fallback for development and testing
+class TextInputFallback {
+  private isListening = false;
+
+  async startListening(): Promise<string> {
+    if (this.isListening) {
+      throw new Error('Already listening');
+    }
+
+    this.isListening = true;
+    
+    return new Promise((resolve, reject) => {
+      Alert.prompt(
+        'Voice Input Simulation',
+        'Enter your golf shot (e.g., "7 iron 150 yards straight"):',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => {
+            this.isListening = false;
+            reject(new Error('User cancelled'));
+          }},
+          { text: 'Submit', onPress: (text) => {
+            this.isListening = false;
+            resolve(text || 'driver 280 yards straight');
+          }}
+        ],
+        'plain-text',
+        '7 iron 150 yards straight' // Default text
+      );
+    });
+  }
+
+  async stopListening() {
+    this.isListening = false;
+  }
+
+  isCurrentlyListening() {
+    return this.isListening;
+  }
 }
 
 // Mock speech recognition for development (since Expo Go doesn't support real speech recognition)
@@ -113,12 +153,19 @@ const GOLF_TERMS = {
 };
 
 class VoiceInputService {
-  private speechRecognition: MockSpeechRecognition;
+  private inputHandler: TextInputFallback | MockSpeechRecognition;
   
   constructor() {
-    // For now, use mock speech recognition
-    // In production, this would integrate with device speech recognition
-    this.speechRecognition = new MockSpeechRecognition();
+    // Use text input fallback for development builds, mock for other testing
+    const isProduction = !__DEV__;
+    
+    if (isProduction) {
+      console.log('Using text input fallback for voice input');
+      this.inputHandler = new TextInputFallback();
+    } else {
+      console.log('Using mock speech recognition for development');
+      this.inputHandler = new MockSpeechRecognition();
+    }
   }
 
   /**
@@ -126,7 +173,8 @@ class VoiceInputService {
    */
   async startListening(): Promise<VoiceInputResult> {
     try {
-      const speechText = await this.speechRecognition.startListening();
+      const speechText = await this.inputHandler.startListening();
+      console.log('Voice input received:', speechText);
       return this.parseGolfSpeech(speechText);
     } catch (error) {
       throw new Error(`Voice recognition failed: ${error.message}`);
@@ -137,14 +185,14 @@ class VoiceInputService {
    * Stop listening for voice input
    */
   stopListening(): void {
-    this.speechRecognition.stopListening();
+    this.inputHandler.stopListening();
   }
 
   /**
    * Check if currently listening
    */
   isListening(): boolean {
-    return this.speechRecognition.isCurrentlyListening();
+    return this.inputHandler.isCurrentlyListening();
   }
 
   /**

@@ -207,6 +207,7 @@ export default function StartRoundScreen({ navigation }: any) {
 
     saveLastUsedProfile(selectedProfile.id);
     
+    console.log('Starting round - weather collection feature temporarily disabled');
     setLoading(true);
     try {
       // Try to get weather data for the course location
@@ -225,20 +226,7 @@ export default function StartRoundScreen({ navigation }: any) {
           course_id: selectedCourse.id,
           tee_id: selectedTeeId,
           started_at: new Date().toISOString(),
-          status: 'in_progress',
-          weather_data: weatherData ? {
-            temperature: weatherData.temperature,
-            humidity: weatherData.humidity,
-            wind_speed: weatherData.windSpeed,
-            wind_direction: weatherData.windDirection,
-            wind_gust: weatherData.windGust,
-            description: weatherData.description,
-            visibility: weatherData.visibility,
-            pressure: weatherData.pressure,
-            uv_index: weatherData.uvIndex,
-            feels_like: weatherData.feelsLike
-          } : null,
-          weather_fetched_at: weatherData ? new Date().toISOString() : null
+          status: 'in_progress'
         })
         .select()
         .single();
