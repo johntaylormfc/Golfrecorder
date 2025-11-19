@@ -4,7 +4,13 @@ import { createClient } from 'npm:@supabase/supabase-js';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
 const LLM_API_KEY = Deno.env.get('LLM_API_KEY') ?? '';
-const LLM_API_BASE = Deno.env.get('LLM_API_BASE') ?? 'https://api.openai.com/v1';
+let LLM_API_BASE = Deno.env.get('LLM_API_BASE');
+
+// Auto-detect OpenRouter
+if (!LLM_API_BASE && LLM_API_KEY.startsWith('sk-or-')) {
+  LLM_API_BASE = 'https://openrouter.ai/api/v1';
+}
+LLM_API_BASE = LLM_API_BASE ?? 'https://api.openai.com/v1';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -84,30 +90,62 @@ serve(async (req: Request) => {
 
     if (!LLM_API_KEY) return new Response('LLM not configured', { status: 500 });
 
-    const response = await fetch(`${LLM_API_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${LLM_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'system', content: systemMessage },
-          { role: 'user', content: userMessage },
-        ],
-        max_tokens: 1024,
-      }),
-    });
+    let aiMarkdown = '';
 
-    if (!response.ok) {
-      const text = await response.text();
-      console.error('LLM error:', response.status, text);
-      return new Response(JSON.stringify({ error: 'LLM call failed', status: response.status, body: text }), { status: 502 });
+    if (LLM_API_KEY.startsWith('sk-ant-')) {
+      // Anthropic API
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': LLM_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 1024,
+          system: systemMessage,
+          messages: [
+            { role: 'user', content: userMessage },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('Anthropic error:', response.status, text);
+        return new Response(JSON.stringify({ error: 'LLM call failed', status: response.status, body: text }), { status: 502 });
+      }
+
+      const payload = await response.json();
+      aiMarkdown = payload.content?.[0]?.text ?? '';
+    } else {
+      // OpenAI / OpenRouter API
+      const response = await fetch(`${LLM_API_BASE}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${LLM_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: systemMessage },
+            { role: 'user', content: userMessage },
+          ],
+          max_tokens: 1024,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('LLM error:', response.status, text);
+        return new Response(JSON.stringify({ error: 'LLM call failed', status: response.status, body: text }), { status: 502 });
+      }
+
+      const payload = await response.json();
+      aiMarkdown = payload.choices?.[0]?.message?.content ?? '';
     }
-
-    const payload = await response.json();
-    const aiMarkdown = payload.choices?.[0]?.message?.content ?? '';
 
     await supabase.from('rounds').update({ ai_summary_markdown: aiMarkdown, ai_summary_generated_at: new Date().toISOString() }).eq('id', roundId);
 
