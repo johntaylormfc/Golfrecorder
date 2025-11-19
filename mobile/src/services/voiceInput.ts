@@ -1,4 +1,15 @@
 import { Platform, Alert } from 'react-native';
+// import { ExpoSpeechRecognitionModule } from "expo-speech-recognition";
+
+let ExpoSpeechRecognitionModule: any = null;
+try {
+  // Safely attempt to load the native module
+  // This is required because Expo Go does not have the native module linked
+  // and the package throws an error on import if the module is missing
+  ExpoSpeechRecognitionModule = require("expo-speech-recognition").ExpoSpeechRecognitionModule;
+} catch (e) {
+  console.log("ExpoSpeechRecognition native module not found (expected in Expo Go)");
+}
 
 // Voice input service for golf shot entry
 // Provides speech-to-text functionality and natural language parsing for golf terms
@@ -18,6 +29,99 @@ export interface VoiceInputResult {
   suggestions: string[];
 }
 
+// Real speech recognition using expo-speech-recognition
+class RealSpeechRecognition {
+  private isListening = false;
+  private resolvePromise: ((value: string) => void) | null = null;
+  private rejectPromise: ((reason?: any) => void) | null = null;
+  private resultSubscription: any = null;
+  private errorSubscription: any = null;
+
+  async startListening(): Promise<string> {
+    if (this.isListening) {
+      throw new Error('Already listening');
+    }
+
+    if (!ExpoSpeechRecognitionModule) {
+       throw new Error("Speech recognition module not found. Are you running in Expo Go?");
+    }
+
+    const permissions = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+    if (!permissions.granted) {
+      throw new Error('Microphone permission not granted');
+    }
+
+    this.isListening = true;
+
+    return new Promise((resolve, reject) => {
+      this.resolvePromise = resolve;
+      this.rejectPromise = reject;
+
+      // Clean up previous subscriptions if any
+      this.cleanupSubscriptions();
+
+      this.resultSubscription = ExpoSpeechRecognitionModule.addListener("result", (event) => {
+        if (event.isFinal && event.results.length > 0) {
+          const transcript = event.results[0].transcript;
+          this.finish(transcript);
+        }
+      });
+
+      this.errorSubscription = ExpoSpeechRecognitionModule.addListener("error", (event) => {
+        // Ignore "no-speech" error if we just want to stop or retry, but here we reject
+        this.error(new Error(event.message));
+      });
+
+      ExpoSpeechRecognitionModule.start({
+        lang: "en-US",
+        interimResults: false,
+        maxAlternatives: 1,
+      });
+    });
+  }
+
+  stopListening() {
+    if (this.isListening) {
+      ExpoSpeechRecognitionModule.stop();
+    }
+  }
+
+  isCurrentlyListening() {
+    return this.isListening;
+  }
+
+  private finish(result: string) {
+    this.isListening = false;
+    this.cleanupSubscriptions();
+    if (this.resolvePromise) {
+      this.resolvePromise(result);
+      this.resolvePromise = null;
+      this.rejectPromise = null;
+    }
+  }
+
+  private error(err: Error) {
+    this.isListening = false;
+    this.cleanupSubscriptions();
+    if (this.rejectPromise) {
+      this.rejectPromise(err);
+      this.resolvePromise = null;
+      this.rejectPromise = null;
+    }
+  }
+
+  private cleanupSubscriptions() {
+    if (this.resultSubscription) {
+      this.resultSubscription.remove();
+      this.resultSubscription = null;
+    }
+    if (this.errorSubscription) {
+      this.errorSubscription.remove();
+      this.errorSubscription = null;
+    }
+  }
+}
+
 // Text input fallback for development and testing
 class TextInputFallback {
   private isListening = false;
@@ -29,6 +133,33 @@ class TextInputFallback {
 
     this.isListening = true;
     
+    if (Platform.OS === 'android') {
+      return new Promise((resolve, reject) => {
+        Alert.alert(
+          'Voice Input Simulation (Android)',
+          'Select a simulated voice input (Alert.prompt not supported on Android):',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => {
+              this.isListening = false;
+              reject(new Error('User cancelled'));
+            }},
+            { text: 'Driver 280y', onPress: () => {
+              this.isListening = false;
+              resolve('driver 280 yards straight');
+            }},
+            { text: '7 Iron 150y', onPress: () => {
+              this.isListening = false;
+              resolve('7 iron 150 yards draw');
+            }},
+            { text: 'Putter 15ft', onPress: () => {
+              this.isListening = false;
+              resolve('putter 15 feet straight');
+            }}
+          ]
+        );
+      });
+    }
+
     return new Promise((resolve, reject) => {
       Alert.prompt(
         'Voice Input Simulation',
@@ -153,18 +284,18 @@ const GOLF_TERMS = {
 };
 
 class VoiceInputService {
-  private inputHandler: TextInputFallback | MockSpeechRecognition;
+  private inputHandler: TextInputFallback | MockSpeechRecognition | RealSpeechRecognition;
   
   constructor() {
-    // Use text input fallback for development builds, mock for other testing
-    const isProduction = !__DEV__;
+    // Check if native module is available
+    const isNativeModuleAvailable = !!ExpoSpeechRecognitionModule;
     
-    if (isProduction) {
-      console.log('Using text input fallback for voice input');
-      this.inputHandler = new TextInputFallback();
+    if (isNativeModuleAvailable) {
+      console.log('Using RealSpeechRecognition for voice input');
+      this.inputHandler = new RealSpeechRecognition();
     } else {
-      console.log('Using mock speech recognition for development');
-      this.inputHandler = new MockSpeechRecognition();
+      console.log('Native speech recognition not available (likely Expo Go), falling back to text input');
+      this.inputHandler = new TextInputFallback();
     }
   }
 

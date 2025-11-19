@@ -54,6 +54,8 @@ export interface Round {
   par_total?: number | null;
   status?: 'in_progress' | 'completed' | 'abandoned';
   ai_summary_markdown?: string | null;
+  weather_data?: any | null;
+  weather_fetched_at?: string | null;
 }
 
 export interface RoundHole {

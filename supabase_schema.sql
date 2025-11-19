@@ -245,9 +245,9 @@ DECLARE
   putts_count int;
   penalty_total int;
   last_shot_num int;
-  fir boolean := false;
-  gir boolean := false;
-  gross_score int;
+  v_fir boolean := false;
+  v_gir boolean := false;
+  v_gross_score int;
 BEGIN
   SELECT * INTO r_round FROM rounds WHERE id = p_round_id;
   IF NOT FOUND THEN
@@ -268,36 +268,36 @@ BEGIN
   SELECT COALESCE(SUM(penalty_strokes),0) INTO penalty_total FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number;
   SELECT MAX(shot_number) INTO last_shot_num FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number;
 
-  -- Score: gross_score = last_shot_num + penalty_total (approximation)
+  -- Score: v_gross_score = last_shot_num + penalty_total (approximation)
   IF last_shot_num IS NULL THEN
-    gross_score := NULL;
+    v_gross_score := NULL;
   ELSE
-    gross_score := last_shot_num + COALESCE(penalty_total, 0);
+    v_gross_score := last_shot_num + COALESCE(penalty_total, 0);
   END IF;
 
   -- FIR: For par 4/5, true if tee shot ended in fairway
   IF rh_par >= 4 THEN
     IF EXISTS (SELECT 1 FROM shots s JOIN round_holes rh ON rh.round_id = p_round_id AND rh.hole_number = p_hole_number WHERE s.round_id = p_round_id AND s.hole_number = p_hole_number AND s.shot_number = 1 AND s.end_lie = 'fairway') THEN
-      fir := true;
+      v_fir := true;
     END IF;
   END IF;
 
   -- GIR: If reaching green within par-2 strokes
   IF rh_par = 3 THEN
-    gir := EXISTS (SELECT 1 FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number AND shot_number = 1 AND end_lie = 'green');
+    v_gir := EXISTS (SELECT 1 FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number AND shot_number = 1 AND end_lie = 'green');
   ELSIF rh_par = 4 THEN
-    gir := EXISTS (SELECT 1 FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number AND shot_number <= 2 AND end_lie = 'green');
+    v_gir := EXISTS (SELECT 1 FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number AND shot_number <= 2 AND end_lie = 'green');
   ELSIF rh_par = 5 THEN
-    gir := EXISTS (SELECT 1 FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number AND shot_number <= 3 AND end_lie = 'green');
+    v_gir := EXISTS (SELECT 1 FROM shots WHERE round_id = p_round_id AND hole_number = p_hole_number AND shot_number <= 3 AND end_lie = 'green');
   END IF;
 
   -- Update the round_holes row
   UPDATE round_holes SET
     putts = putts_count,
     penalties = COALESCE(penalty_total, 0),
-    gross_score = gross_score,
-    fir = fir,
-    gir = gir,
+    gross_score = v_gross_score,
+    fir = v_fir,
+    gir = v_gir,
     updated_at = now()
   WHERE id = rh_id;
 
@@ -323,5 +323,16 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER shots_after_insert_update
 AFTER INSERT OR UPDATE ON shots FOR EACH ROW EXECUTE FUNCTION shots_after_change_refresh();
+
+-- Add weather columns to rounds table if they don't exist
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'rounds' AND column_name = 'weather_data') THEN
+        ALTER TABLE rounds ADD COLUMN weather_data jsonb;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'rounds' AND column_name = 'weather_fetched_at') THEN
+        ALTER TABLE rounds ADD COLUMN weather_fetched_at timestamptz;
+    END IF;
+END $$;
 
 -- End of schema

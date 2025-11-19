@@ -61,28 +61,37 @@ export default function ProfileScreen({ navigation }: any) {
       // Try to get existing user
       let { data: { user } } = await supabase.auth.getUser();
       
-      // If no user, try to sign up with a temporary email/password
+      // If no user, try to sign in anonymously first
       if (!user) {
-        console.log('No authenticated user found, attempting sign up...');
-        const tempEmail = `user_${Date.now()}@golfrecorder.temp`;
-        const tempPassword = Math.random().toString(36).slice(-12) + 'Aa1!';
+        console.log('No authenticated user found, attempting anonymous sign in...');
         
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: tempEmail,
-          password: tempPassword,
-        });
+        const { data: anonData, error: anonError } = await supabase.auth.signInAnonymously();
         
-        if (authError) {
-          console.error('Auth error:', authError);
-          Alert.alert(
-            'Authentication Required', 
-            'Please enable anonymous sign-ins or email auth in your Supabase project:\n\n1. Go to Authentication > Providers\n2. Enable Anonymous or Email provider\n\nFor now, proceeding without save...'
-          );
-          // Navigate anyway for testing
-          navigation.navigate('StartRound');
-          return;
+        if (anonError) {
+          console.log('Anonymous sign in failed, trying temp email sign up...', anonError);
+          // Fallback to temp email if anonymous fails (e.g. if not enabled)
+          const tempEmail = `user_${Date.now()}@golfrecorder.temp`;
+          const tempPassword = Math.random().toString(36).slice(-12) + 'Aa1!';
+          
+          const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: tempEmail,
+            password: tempPassword,
+          });
+          
+          if (authError) {
+            console.error('Auth error:', authError);
+            Alert.alert(
+              'Authentication Required', 
+              'Please enable anonymous sign-ins or email auth in your Supabase project:\n\n1. Go to Authentication > Providers\n2. Enable Anonymous or Email provider\n\nFor now, proceeding without save...'
+            );
+            // Navigate anyway for testing
+            navigation.navigate('StartRound');
+            return;
+          }
+          user = authData.user;
+        } else {
+          user = anonData.user;
         }
-        user = authData.user;
       }
 
       if (!user) {

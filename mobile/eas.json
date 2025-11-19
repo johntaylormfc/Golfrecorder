@@ -17,6 +17,12 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ppgeznlkzkkttlkgvgfv.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBwZ2V6bmxremtrdHRsa2d2Z2Z2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMzNzM5MzMsImV4cCI6MjA3ODk0OTkzM30.xIhx2uZxqjHrx6Dn2c1dnKRDVapoRLEbgR4KrIUMXDs",
+        "EXPO_PUBLIC_GOLF_API_KEY": "JL4HBGKKLZZSXLHGDYRSFUUVLI",
+        "EXPO_PUBLIC_GOLF_API_URL": "https://api.golfcourseapi.com"
       }
     },
     "production": {
